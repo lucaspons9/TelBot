@@ -27,7 +27,7 @@ class Edge:
 
 def get_osmnx_graph() -> OsmnxGraph:
     """Returns a osmnxgraph"""
-    g: OsmnxGraph = ox.graph_from_place('Barcelona, Catalonia, Spain', simplify=True, network_type='walk')
+    g: OsmnxGraph = ox.graph_from_place('Barcelona, Catalonia, Spain', simplify = True, network_type='walk')
     return g
 
 def save_osmnx_graph(g: OsmnxGraph, filename: str) -> None:
@@ -59,7 +59,7 @@ def load_city_graph(filename: str) -> CityGraph:
         g: CityGraph = pickle.load(pickle_in)
         pickle_in.close()
     else:
-        g1: CityGraph = load_osmnx_graph("barcelona_walk")
+        g1: OsmnxGraph = load_osmnx_graph("barcelona_walk")
         g2: MetroGraph = metro.get_metro_graph()
         g = build_city_graph(g1, g2)
         save_city_graph(g, filename)
@@ -94,7 +94,7 @@ def add_g1(g: CityGraph, g1: OsmnxGraph) -> None:
 
 def add_g2(g: CityGraph, g2: MetroGraph) -> None:
     for node in list(g2.nodes):
-        node_type: str = str(type(g2.nodes[node]["info"]))[14:-2] # <class 'metro.Station'>
+        node_type: str = str(type(g2.nodes[node]["info"]))[14:-2] # <class 'metro.Station'>; <class 'metro.Access'>
         coord: Coord = g2.nodes[node]["position"]
         g.add_node(node, type = node_type, position = coord)
 
@@ -110,16 +110,11 @@ def add_g2(g: CityGraph, g2: MetroGraph) -> None:
         time: float = distance / speed
         g.add_edge(e[0], e[1], info = edge, weight = time)
 
-def connect_accesses_to_closest_street(g: CityGraph) -> None:
+def connect_accesses_to_closest_intersection(g: CityGraph, g1: OsmnxGraph) -> None:
     accesses_list: metro.Accesses = metro.read_accesses()
     for access in accesses_list:
-        min_dist: float = float('inf')
-        closest_node = None
-        for node in g.nodes:
-            if g.nodes[node]["type"] == "Street" and metro.get_distance(access.position, g.nodes[node]["position"]) < min_dist:
-                min_dist = metro.get_distance(access.position, g.nodes[node]["position"])
-                closest_node = node
-        edge = Edge("Street", min_dist, "#fbac2c")
+        closest_node, distance  = ox.distance.nearest_nodes(g1, access.position[0], access.position[1], return_dist = True) # 562726252 = Id node; 35,8m = distancia entre access i node
+        edge = Edge("Street", distance, "#fbac2c")
         speed: float = 1.5
         time: float = distance / speed
         g.add_edge(access.id, closest_node, info = edge, weight = time)
@@ -129,18 +124,20 @@ def build_city_graph(g1: OsmnxGraph, g2: MetroGraph) -> CityGraph:
     g = nx.Graph()
     add_g1(g, g1)
     add_g2(g, g2)
-    connect_accesses_to_closest_street(g)
+    connect_accesses_to_closest_intersection(g, g1)
     g.remove_edges_from(nx.selfloop_edges(g))
-    return g
+    return g # Fusio de tots els carrers i el graf metro
+
+def get_closest_node(ox_g: OsmnxGraph, position: Coord) -> NodeID:
+    x: float = position[0]
+    y: float = position[1]
+    node: NodeID = ox.distance.nearest_nodes(ox_g, x, y)
+    return node
 
 def find_path(ox_g: OsmnxGraph, g: CityGraph, src: Coord, dst: Coord) -> Path:
-    x_src: float = src[1]
-    y_src: float = src[0]
-    id_src_node: NodeID = ox.distance.get_nearest_node(ox_g, (x_src, y_src))
-    x_dst: float = dst[1]
-    y_dst: float = dst[0]
-    id_dst_node: NodeID = ox.distance.get_nearest_node(ox_g, (x_dst, y_dst))
-    path: Path = nx.shortest_path(g, source = id_src_node, target = id_dst_node, weight = "weight", method='dijkstra')
+    src_node: NodeID = get_closest_node(ox_g, src)
+    dst_node: NodeID = get_closest_node(ox_g, dst)
+    path: Path = nx.shortest_path(g, source = src_node, target = dst_node, weight = "weight", method='dijkstra')
     return path
 
 def find_time_path(g: CityGraph, p: Path) -> int:
@@ -195,11 +192,14 @@ def plot(g: CityGraph, filename: str) -> None:
 def plot_path(g: CityGraph, p: Path, filename: str, src: Coord, dst: Coord) -> None:
     # mostra el camí p en l'arxiu filename
     # We create the empty map
-    m = StaticMap(1000, 1000)
+    m = StaticMap(500, 500)
+
     m.add_marker(CircleMarker(src, "black", 8))
     pos_node_src: Coord = g.nodes[p[0]]["position"]
     m.add_marker(CircleMarker(pos_node_src, "black", 8))
     m.add_line(Line((src, pos_node_src), "black", 5))
+
+
     for i in range(len(p) - 1):
         pos_node_A: Coord = g.nodes[p[i]]["position"]
         pos_node_B: Coord = g.nodes[p[i + 1]]["position"]
@@ -208,29 +208,32 @@ def plot_path(g: CityGraph, p: Path, filename: str, src: Coord, dst: Coord) -> N
         else:
             color: str = g[p[i]][p[i + 1]]["info"].col_id
         m.add_line(Line((pos_node_A, pos_node_B), color, 5))
+
+
     pos_node_dst: Coord = g.nodes[p[-1]]["position"]
     m.add_marker(CircleMarker(pos_node_dst, "black", 8))
     m.add_marker(CircleMarker(dst, "black", 8))
     m.add_line(Line((pos_node_dst, dst), "black", 5))
+    
     # We save the map.
     image = m.render()
     image.save(filename)
 
 def main():
-    # g1: OsmnxGraph = load_osmnx_graph("barcelona_walk")
+    g1: OsmnxGraph = load_osmnx_graph("barcelona_walk")
     # g2: MetroGraph = metro.get_metro_graph()
-    # g = build_city_graph(g1, g2)
-    # save_osmnx_graph(g, "city_graph")
-    g: CityGraph = load_osmnx_graph("city_graph")
+    # g: CityGraph = build_city_graph(g1, g2)
+    # save_osmnx_graph(g, "city_graph_21")
+    g: CityGraph = load_city_graph("city_graph_22")
     # show(g)
-    # plot(g, 'city_map2.png')
+    # plot(g, 'city_map_411.png')
     # print("NODES:", g.number_of_nodes())
     # print("EDGES:", g.number_of_edges())
-    a: Coord = g.nodes[9556190193]["position"]
+    a: Coord = restaurants.find("crep", restaurants.read())[0].position
     b: Coord = restaurants.find("Restaurant Garlana", restaurants.read())[0].position
-    x = find_path(g, a, b)
-    plot_path(g, x, "test2.png", a, b)
-    print(find_time_path(g, x))
+    x = find_path(g1, g, a, b)
+    plot_path(g, x, "test322.png", a, b)
+    # print(find_time_path(g, x))
 
 
 # start_time = time.time()

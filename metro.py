@@ -73,28 +73,30 @@ def add_nodes(g: MetroGraph, stations_list: Stations, i: int) -> None:
     g.add_node(stations_list[i].id, info = stations_list[i], position = stations_list[i].position)
     g.add_node(stations_list[i + 1].id, info = stations_list[i + 1], position = stations_list[i + 1].position)
 
+def add_edge(g: MetroGraph, node_a: int, node_b: int, edge_type: str, distance: float, col_id: str) -> None:
+    edge = Edge(edge_type, distance, col_id)
+    g.add_edge(node_a, node_b, info = edge)
+
+
 def transbordaments(g: MetroGraph, stations_list: Stations) -> None:
     for stationA in stations_list:
         for stationB in stations_list:
             if stationA.name == stationB.name and stationA.id != stationB.id:
-                edge_type: str = "enllaç"
                 distance: float = get_distance(stationA.position, stationB.position)
                 col_id: str = stationA.color_line
-                edge = Edge(edge_type, distance, col_id)
-                g.add_edge(stationA.id, stationB.id, info = edge)
+                add_edge(g, stationA.id, stationB.id, "enllaç", distance, col_id)
 
 def add_stations_edges(g: MetroGraph) -> None: # tipus, (linia), dist, color
     """Adds, as nodes, all stations to the graph and connects them with edges."""
     stations_list: Stations = read_stations()
-    for i in range(len(stations_list) - 1):
+    n: int = len(stations_list)
+    for i in range(n - 1):
         add_nodes(g, stations_list, i)
         # We will add an edge between station i and station i + 1 if they share the same line and are not the same station.
         if stations_list[i].line == stations_list[i + 1].line and stations_list[i].name != stations_list[i + 1].name:
             distance: float = get_distance(stations_list[i].position, stations_list[i + 1].position)
-            edge_type: str = "tram"
             col_id: str = stations_list[i].color_line
-            edge = Edge(edge_type, distance, col_id)
-            g.add_edge(stations_list[i].id, stations_list[i + 1].id, info = edge)
+            add_edge(g, stations_list[i].id, stations_list[i + 1].id, "tram", distance, col_id)
     # We connect all nodes "station" that have the same name but different line. The edge type is "enllaç"
     transbordaments(g, stations_list)
 
@@ -110,10 +112,7 @@ def add_accesses_edges(g: MetroGraph) -> None:
         for station in stations_list:
             if access.station_name == station.name:
                 distance: float = get_distance(access.position, station.position)
-                edge_type: str = "access"
-                col_id: str = "#ed1cd8"
-                edge = Edge(edge_type, distance, col_id)
-                g.add_edge(access.id, station.id, info = edge)
+                add_edge(g, access.id, station.id, "access", distance, "#ed1cd8")
 
 def get_metro_graph() -> MetroGraph:
     """Returns a graph with stations and accesses as nodes."""
@@ -127,14 +126,14 @@ def get_metro_graph() -> MetroGraph:
 def show(g: MetroGraph) -> None:
     """Prints the representation of a graph with nodes painted in blue and edges in black"""
     # To place each node in the correct position we need the function "get_node_attributes()" that returns a dictionary with the nodes labels as elements and their position coordinates as values.
-    pos = nx.get_node_attributes(g,'position')
+    pos = nx.get_node_attributes(g,'position') # {nodeID-1: (x,y), nodeID-2: (x,y), nodeID-3: (x,y), nodeID-4: (x,y)}
     nx.draw(g, pos, node_size = 10)
     plt.show()
 
 def plot(g: MetroGraph, filename: str) -> None:
     """Prints the representation of a graph on top of a map with nodes painted in black and edges in different colors, depending on the line they represent."""
     # We create the list edges which is a list of edges, each one represented as a Tuple of two nodes.
-    edges: List[Tuple[str, str]] = list(g.edges)
+    edges: List[Tuple[str, str]] = list(g.edges) # [(nodeA, nodeB), (nodeC, nodeD), ...]
     # We create the dictionary pos that contains the position of every node in the graph.
     pos = nx.get_node_attributes(g,'position')
     # We create the empty map
@@ -158,7 +157,7 @@ def main():
     g: MetroGraph = get_metro_graph()
     print("Nodes", g.number_of_nodes())
     print("Edges", g.number_of_edges())
-    #show(g)
-    plot(g, 'metro.png')
+    show(g)
+    # plot(g, 'metro.png')
 
-# main()
+main()
