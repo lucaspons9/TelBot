@@ -133,18 +133,13 @@ def build_city_graph(g1: OsmnxGraph, g2: MetroGraph) -> CityGraph:
     g.remove_edges_from(nx.selfloop_edges(g))
     return g
 
-def find_closest_node(g: CityGraph, position: Coord) -> NodeID:
-    min_dist: float = float('inf')
-    closest_node: NodeID = None
-    for node in list(g.nodes):
-       if metro.get_distance(g.nodes[node]["position"], position) < min_dist:
-           min_dist = metro.get_distance(g.nodes[node]["position"], position)
-           closest_node = node
-    return closest_node
-
-def find_path(g: CityGraph, src: Coord, dst: Coord) -> Path:
-    id_src_node: NodeID = find_closest_node(g, src)
-    id_dst_node: NodeID = find_closest_node(g, dst)
+def find_path(ox_g: OsmnxGraph, g: CityGraph, src: Coord, dst: Coord) -> Path:
+    x_src: float = src[1]
+    y_src: float = src[0]
+    id_src_node: NodeID = ox.distance.get_nearest_node(ox_g, (x_src, y_src))
+    x_dst: float = dst[1]
+    y_dst: float = dst[0]
+    id_dst_node: NodeID = ox.distance.get_nearest_node(ox_g, (x_dst, y_dst))
     path: Path = nx.shortest_path(g, source = id_src_node, target = id_dst_node, weight = "weight", method='dijkstra')
     return path
 
@@ -204,7 +199,7 @@ def plot_path(g: CityGraph, p: Path, filename: str, src: Coord, dst: Coord) -> N
     m.add_marker(CircleMarker(src, "black", 8))
     pos_node_src: Coord = g.nodes[p[0]]["position"]
     m.add_marker(CircleMarker(pos_node_src, "black", 8))
-    m.add_line(Line((src, pos_node_src), "black", 3))
+    m.add_line(Line((src, pos_node_src), "black", 5))
     for i in range(len(p) - 1):
         pos_node_A: Coord = g.nodes[p[i]]["position"]
         pos_node_B: Coord = g.nodes[p[i + 1]]["position"]
@@ -212,17 +207,17 @@ def plot_path(g: CityGraph, p: Path, filename: str, src: Coord, dst: Coord) -> N
             color: str = "black"
         else:
             color: str = g[p[i]][p[i + 1]]["info"].col_id
-        m.add_line(Line((pos_node_A, pos_node_B), color, 3))
+        m.add_line(Line((pos_node_A, pos_node_B), color, 5))
     pos_node_dst: Coord = g.nodes[p[-1]]["position"]
     m.add_marker(CircleMarker(pos_node_dst, "black", 8))
     m.add_marker(CircleMarker(dst, "black", 8))
-    m.add_line(Line((pos_node_dst, dst), "black", 3))
+    m.add_line(Line((pos_node_dst, dst), "black", 5))
     # We save the map.
     image = m.render()
     image.save(filename)
 
 def main():
-    # g1: CityGraph = load_osmnx_graph("barcelona_walk")
+    # g1: OsmnxGraph = load_osmnx_graph("barcelona_walk")
     # g2: MetroGraph = metro.get_metro_graph()
     # g = build_city_graph(g1, g2)
     # save_osmnx_graph(g, "city_graph")
@@ -238,6 +233,6 @@ def main():
     print(find_time_path(g, x))
 
 
-start_time = time.time()
-main()
-print("--- %s seconds ---" % (time.time() - start_time))
+# start_time = time.time()
+# main()
+# print("--- %s seconds ---" % (time.time() - start_time))

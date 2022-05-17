@@ -14,11 +14,13 @@ def load_restaurants() -> restaurants.Restaurants:
 
 def start(update, context):
     """Sends the user a welcome message back."""
-    context.bot.send_message(chat_id = update.effective_chat.id, text ="Hi! I'm ready to guide you to any restaurant you wish.")
+    name: str = update.effective_chat.first_name
+    context.bot.send_message(chat_id = update.effective_chat.id, text ="Hi %s! I'm ready to guide you to any restaurant you wish. To learn how to use this bot, please type the command /help." % name)
 
 def help(update, context):
     """Sends the user a guide message of how to use this bot."""
-    context.bot.send_message(chat_id = update.effective_chat.id, text ="You can use the following commands: .")
+    help_text: str = "To get the full experience of this bot, you can use the following commands:\n\n🔵 /author: Shows the authors of this project.\n\n🔵 /find <query>: Shows the 12 closest matching restaurants in barcelona.\n\n🔵 /info <index>: Shows the information about the restaurant the user chose.\n\n🔵 /guide <index>: First asks the user for his/her current location and, once it reads it, returns an image of the fastest way to get to the restaurant chosen, and how long it takes to get there on average.\n"
+    context.bot.send_message(chat_id = update.effective_chat.id, text = help_text)
 
 def author(update, context):
     """Sends the user a message with the names of the creators of this bot and project."""
@@ -79,7 +81,7 @@ def path(update, context):
         # We get the position of the restaurant.
         restaurant_position: Coord = context.user_data["restaurant_position"]
         # We build the path with the functino find_path() from city.py
-        path: Path = find_path(load_graph(), user_position, restaurant_position)
+        path: Path = find_path(load_osmnx_graph("barcelona_walk") ,load_graph(), user_position, restaurant_position)
         total_time: int = int(find_time_path(load_graph(), path))
         # We create a random name for the filename since, at the end of the function, the file will be deleted
         filename: str = "%d.png" % random.randint(1000000, 9999999)
